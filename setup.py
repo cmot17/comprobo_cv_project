@@ -1,11 +1,11 @@
-from setuptools import setup
+from setuptools import find_packages, setup
 
-package_name = 'neato_fetch'
+package_name = 'CompRobo-CV-Project'
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name],
+    packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -13,14 +13,13 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='pruvolo',
-    maintainer_email='paullundyruvolo@gmail.com',
+    maintainer='swasti',
+    maintainer_email='swasti324@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'reference_ball_tracker = neato_fetch.reference_ball_tracker:main',
         ],
     },
 )
