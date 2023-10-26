@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'CompRobo-CV-Project'
+package_name = 'comprobo_cv_project'
 
 setup(
     name=package_name,
@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'neato_fetch = comprobo_cv_project.neato_fetch:main'
         ],
     },
 )
