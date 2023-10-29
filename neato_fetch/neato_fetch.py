@@ -94,36 +94,50 @@ class NeatoFetch(Node):
             self.binary_image = cv2.dilate(self.binary_image, None, iterations=2)
 
              # Find contours
+
             contours, _ = cv2.findContours(self.binary_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+            
+
+            most_circular_contour = None
+            highest_circularity = 0
+            
             for contour in contours:
                 perimeter = cv2.arcLength(contour, True)
                 area = cv2.contourArea(contour)
-                
-                # Avoid division by zero and small contours
-                # cv2.drawContours(self.cv_image, [contour], 0, (0,255,0), 3)
-                print(f'Contour detected with perimeter {perimeter} and area {area}')
-                if perimeter > 0 and area > 50:
+
+                if perimeter > 0 and area > 50:  # Avoid division by zero and small contours
                     circularity = 4 * np.pi * area / (perimeter * perimeter)
-                    print(f'Perimeter and area met threshold, circularity: {circularity}')
-                    if 0.25 <= circularity <= 1.2:  # Adjust thresholds as needed
-                        (x, y), radius = cv2.minEnclosingCircle(contour)
-                        center = (int(x), int(y))
-                        radius = int(radius)
-                        cv2.circle(self.cv_image, center, radius, (0, 255, 0), 2)
+                    if 0.25 <= circularity <= 1.2 and circularity > highest_circularity:  # Adjust thresholds as needed
+                        highest_circularity = circularity
+                        most_circular_contour = contour
+            height, width = self.cv_image.shape[:2]
+            print(f"Width: {width}, Height: {height}")
+            fwd_vel = 0.0
+            rot_vel = 0.0
+            # Draw the most circular contour
+            if most_circular_contour is not None:
+                (x, y), radius = cv2.minEnclosingCircle(most_circular_contour)
+                center = (int(x), int(y))
+                radius = int(radius)
+                cv2.circle(self.cv_image, center, radius, (0, 255, 0), 2)
+                rot_vel = -1 * (x - (width / 2)) / (width / 2)
+                fwd_vel = 0.2
+                print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
+                
+                print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
+            print("messsage published")
+            self.pub.publish(Twist(linear=Vector3(x=fwd_vel,y=0.0,z=0.0), angular=Vector3(x=0.0,y=0.0,z=rot_vel)))
             cv2.imshow("video_window", self.cv_image)
             cv2.imshow("binary_window", self.binary_image)
             cv2.waitKey(5)
 
 
-if __name__ == "__main__":
-    node = NeatoFetch("/camera/image_raw")
-    node.run()
-
 
 def main(args=None):
     rclpy.init()
-    n = NeatoFetch("camera/image_raw")
-    rclpy.spin(n)
+    node = NeatoFetch("camera/image_raw")
+    rclpy.spin(node)
     rclpy.shutdown()
 
 
