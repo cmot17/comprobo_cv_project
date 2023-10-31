@@ -113,6 +113,9 @@ class NeatoFetch(Node):
                         most_circular_contour = contour
             height, width = self.cv_image.shape[:2]
             print(f"Width: {width}, Height: {height}")
+            start_point = (width -100,height)
+            end_point = (100,300)
+            cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
             fwd_vel = 0.0
             rot_vel = 0.0
             # Draw the most circular contour
@@ -121,9 +124,13 @@ class NeatoFetch(Node):
                 center = (int(x), int(y))
                 radius = int(radius)
                 cv2.circle(self.cv_image, center, radius, (0, 255, 0), 2)
-                rot_vel = -1 * (x - (width / 2)) / (width / 2)
-                fwd_vel = 0.2
-                print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
+                if most_circular_contour is not None:
+                    rot_vel = -1 * (x - (width / 2)) / (width / 2)
+                    fwd_vel = 0.2
+                    # rot_vel = 0.0
+                    # fwd_vel = 0.0
+                    print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
+        
                 
                 print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
             print("messsage published")
