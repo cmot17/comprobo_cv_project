@@ -29,6 +29,7 @@ class NeatoFetch(Node):
         start_point = (self.width -100, self.height)
         end_point = (100,300)
         self.possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
+        self.state = "go_to_ball"
 
 
     def process_image(self, msg):
@@ -69,73 +70,76 @@ class NeatoFetch(Node):
             hsv = cv2.cvtColor(self.cv_image[y:y+1, x:x+1], cv2.COLOR_BGR2HSV)[0][0]
             info_text = "BGR: (%d, %d, %d), HSV: (%d, %d, %d)" % (b, g, r, hsv[0], hsv[1], hsv[2])
             cv2.putText(self.cv_image, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-    def detect_ball(self):
-        pass 
-        # 
+    def go_to_ball(self):
+        self.hsv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2HSV)
+        self.binary_image = cv2.inRange(
+            self.hsv_image,
+            (self.hue_lower_bound, self.saturation_lower_bound, self.value_lower_bound),
+            (self.hue_upper_bound, self.saturation_upper_bound, self.value_upper_bound)
+        )
+        self.binary_image = cv2.erode(self.binary_image, None, iterations=2)
+        self.binary_image = cv2.dilate(self.binary_image, None, iterations=2)
+
+            # Find contours
+
+        contours, _ = cv2.findContours(self.binary_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        
+
+        most_circular_contour = None
+        highest_circularity = 0
+        
+        for contour in contours:
+            perimeter = cv2.arcLength(contour, True)
+            area = cv2.contourArea(contour)
+
+            if perimeter > 0 and area > 50:  # Avoid division by zero and small contours
+                circularity = 4 * np.pi * area / (perimeter * perimeter)
+                if 0.25 <= circularity <= 1.2 and circularity > highest_circularity:  # Adjust thresholds as needed
+                    highest_circularity = circularity
+                    most_circular_contour = contour
+        print(f"Width: {self.width}, Height: {self.height}")
+
+        
+        start_point = (self.width -100,self.height)
+        end_point = (100,300)
+        possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
+
+        fwd_vel = 0.0
+        rot_vel = 0.0
+        # Draw the most circular contour
+        if most_circular_contour is not None:
+            (x, y), radius = cv2.minEnclosingCircle(most_circular_contour)
+            center = (int(x), int(y))
+            radius = int(radius)
+            cv2.circle(self.cv_image, center, radius, (0, 255, 0), 2)
+                
+            if most_circular_contour is not None:
+                if most_circular_contour < possession_rect:
+                    rot_vel = 0.0
+                    fwd_vel = 0.0
+                    print(f'BALL IS IN POSSESSION BABYYYY but at the moment we are just stopped with it tho.')
+
+                else:
+                    rot_vel = -1 * (x - (self.width / 2)) / (self.width / 2)
+                    fwd_vel = 0.2
+                    print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
+    
+            
+        print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
+        print("messsage published")
+        self.pub.publish(Twist(linear=Vector3(x=fwd_vel,y=0.0,z=0.0), angular=Vector3(x=0.0,y=0.0,z=rot_vel)))
+        
     # i wanna call this in the run loop so we have better code readability but i couldnt figure out how to do that without vscode yelling at me
-    def originSearch(self):
+    def origin_search(self):
         pass
+
+    
         
     def run_loop(self):
         if self.cv_image is not None:
-            self.hsv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2HSV)
-            self.binary_image = cv2.inRange(
-                self.hsv_image,
-                (self.hue_lower_bound, self.saturation_lower_bound, self.value_lower_bound),
-                (self.hue_upper_bound, self.saturation_upper_bound, self.value_upper_bound)
-            )
-            self.binary_image = cv2.erode(self.binary_image, None, iterations=2)
-            self.binary_image = cv2.dilate(self.binary_image, None, iterations=2)
-
-             # Find contours
-
-            contours, _ = cv2.findContours(self.binary_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-            
-
-            most_circular_contour = None
-            highest_circularity = 0
-            
-            for contour in contours:
-                perimeter = cv2.arcLength(contour, True)
-                area = cv2.contourArea(contour)
-
-                if perimeter > 0 and area > 50:  # Avoid division by zero and small contours
-                    circularity = 4 * np.pi * area / (perimeter * perimeter)
-                    if 0.25 <= circularity <= 1.2 and circularity > highest_circularity:  # Adjust thresholds as needed
-                        highest_circularity = circularity
-                        most_circular_contour = contour
-            print(f"Width: {self.width}, Height: {self.height}")
-
-            
-            start_point = (self.width -100,self.height)
-            end_point = (100,300)
-            possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
-
-            fwd_vel = 0.0
-            rot_vel = 0.0
-            # Draw the most circular contour
-            if most_circular_contour is not None:
-                (x, y), radius = cv2.minEnclosingCircle(most_circular_contour)
-                center = (int(x), int(y))
-                radius = int(radius)
-                cv2.circle(self.cv_image, center, radius, (0, 255, 0), 2)
-                    
-                if most_circular_contour is not None:
-                    if most_circular_contour < possession_rect:
-                        rot_vel = 0.0
-                        fwd_vel = 0.0
-                        print(f'BALL IS IN POSSESSION BABYYYY but at the moment we are just stopped with it tho.')
-
-                    else:
-                        rot_vel = -1 * (x - (self.width / 2)) / (self.width / 2)
-                        fwd_vel = 0.2
-                        print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
-        
-                
-            print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
-            print("messsage published")
-            self.pub.publish(Twist(linear=Vector3(x=fwd_vel,y=0.0,z=0.0), angular=Vector3(x=0.0,y=0.0,z=rot_vel)))
+            if (self.state == "go_to_ball"):
+                self.go_to_ball()
             cv2.imshow("video_window", self.cv_image)
             cv2.imshow("binary_window", self.binary_image)
             cv2.waitKey(5)
