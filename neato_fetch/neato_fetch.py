@@ -13,6 +13,7 @@ from imutils.video import VideoStream
 import argparse
 
 
+
 class NeatoFetch(Node):
     """ """
 
@@ -168,23 +169,54 @@ class NeatoFetch(Node):
                 else:
                     print("Contour's bounding box is not within the reference bounding box.")
                     return False
+                
+    def detect_and_go_to_aruco(self, frame):
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
+        aruco_params = cv2.aruco.DetectorParameters()
+        corners, ids, rejectedImgPoints = cv2.aruco.detectMarkers(gray_frame, aruco_dict, parameters=aruco_params)
+        if ids is not None:
+            if 4 in ids:
+                target_index = np.squeeze(np.where(ids == 4))
+                target_corners = corners[target_index]
+
+                center = np.mean(target_corners[0], axis=0)
+                center = tuple(center.astype(int))
+
+                x_error = center[0] - frame.shape[1] // 2
+                angular_vel = -0.001 * x_error
+                fwd_vel = 0.2  
+
+                cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+
+                cv2.circle(frame, center, 5, (0, 255, 0), -1)
+
+                self.pub.publish(Twist(
+                    linear=Vector3(x=fwd_vel, y=0.0, z=0.0),
+                    angular=Vector3(x=0.0, y=0.0, z=angular_vel)
+                ))
+        else:
+            self.pub.publish(Twist(
+                linear=Vector3(x=0.0, y=0.0, z=0.0),
+                angular=Vector3(x=0.0, y=0.0, z=0.0)
+            ))
+
     def origin_search(self):
         pass
 
     
         
     def run_loop(self):
+        #if self.cv_image is not None: 
+          #  if (self.state == "go_to_ball"):
+              #  self.go_to_ball()
+
         if self.cv_image is not None:
-            if (self.state == "go_to_ball"):
-                self.go_to_ball()
+            self.detect_and_go_to_aruco(self.cv_image)
             
             cv2.imshow("video_window", self.cv_image)
             cv2.imshow("binary_window", self.binary_image)
             cv2.waitKey(5)
-
-
-
-
 def main(args=None):
     rclpy.init()
     node = NeatoFetch("camera/image_raw")
