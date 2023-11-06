@@ -25,6 +25,10 @@ class NeatoFetch(Node):
         self.pub = self.create_publisher(Twist, "cmd_vel", 10)
         thread = Thread(target=self.loop_wrapper)
         thread.start()
+        start_point = (width -100,height)
+        end_point = (100,300)
+        self.possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
+
 
     def process_image(self, msg):
         """Process image messages from ROS and stash them in an attribute
@@ -56,23 +60,6 @@ class NeatoFetch(Node):
             self.run_loop()
             time.sleep(0.1)
 
-    def set_hue_lower_bound(self, val):
-        self.hue_lower_bound = val
-
-    def set_saturation_lower_bound(self, val):
-        self.saturation_lower_bound = val
-
-    def set_value_lower_bound(self, val):
-        self.value_lower_bound = val
-
-    def set_hue_upper_bound(self, val):
-        self.hue_upper_bound = val
-
-    def set_saturation_upper_bound(self, val):
-        self.saturation_upper_bound = val
-
-    def set_value_upper_bound(self, val):
-        self.value_upper_bound = val
 
     def process_mouse_event(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -81,7 +68,13 @@ class NeatoFetch(Node):
             hsv = cv2.cvtColor(self.cv_image[y:y+1, x:x+1], cv2.COLOR_BGR2HSV)[0][0]
             info_text = "BGR: (%d, %d, %d), HSV: (%d, %d, %d)" % (b, g, r, hsv[0], hsv[1], hsv[2])
             cv2.putText(self.cv_image, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
+    def detect_ball(self):
+        pass 
+        # 
+    # i wanna call this in the run loop so we have better code readability but i couldnt figure out how to do that without vscode yelling at me
+    def originSearch(self):
+        pass
+        
     def run_loop(self):
         if self.cv_image is not None:
             self.hsv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2HSV)
@@ -113,9 +106,11 @@ class NeatoFetch(Node):
                         most_circular_contour = contour
             height, width = self.cv_image.shape[:2]
             print(f"Width: {width}, Height: {height}")
+            
             start_point = (width -100,height)
             end_point = (100,300)
-            cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
+            possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
+
             fwd_vel = 0.0
             rot_vel = 0.0
             # Draw the most circular contour
@@ -124,12 +119,17 @@ class NeatoFetch(Node):
                 center = (int(x), int(y))
                 radius = int(radius)
                 cv2.circle(self.cv_image, center, radius, (0, 255, 0), 2)
+                    
                 if most_circular_contour is not None:
-                    rot_vel = -1 * (x - (width / 2)) / (width / 2)
-                    fwd_vel = 0.2
-                    # rot_vel = 0.0
-                    # fwd_vel = 0.0
-                    print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
+                    if most_circular_contour < possession_rect:
+                        rot_vel = 0.0
+                        fwd_vel = 0.0
+                        print(f'BALL IS IN POSSESSION BABYYYY but at the moment we are just stopped with it tho.')
+
+                    else:
+                        rot_vel = -1 * (x - (width / 2)) / (width / 2)
+                        fwd_vel = 0.2
+                        print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
         
                 
                 print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
@@ -138,6 +138,8 @@ class NeatoFetch(Node):
             cv2.imshow("video_window", self.cv_image)
             cv2.imshow("binary_window", self.binary_image)
             cv2.waitKey(5)
+        
+
 
 
 
