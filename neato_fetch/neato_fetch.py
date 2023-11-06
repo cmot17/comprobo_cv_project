@@ -25,11 +25,10 @@ class NeatoFetch(Node):
         self.pub = self.create_publisher(Twist, "cmd_vel", 10)
         thread = Thread(target=self.loop_wrapper)
         thread.start()
-        self.height, self.width = self.cv_image.shape[:2]
-        start_point = (self.width -100, self.height)
-        end_point = (100,300)
-        self.possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
+        self.most_circular_contour = None
+
         self.state = "go_to_ball"
+
 
 
     def process_image(self, msg):
@@ -38,7 +37,24 @@ class NeatoFetch(Node):
 
         self.cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         self.hsv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2HSV)
+        
+    def set_hue_lower_bound(self, val):
+        self.hue_lower_bound = val
 
+    def set_saturation_lower_bound(self, val):
+        self.saturation_lower_bound = val
+
+    def set_value_lower_bound(self, val):
+        self.value_lower_bound = val
+
+    def set_hue_upper_bound(self, val):
+        self.hue_upper_bound = val
+
+    def set_saturation_upper_bound(self, val):
+        self.saturation_upper_bound = val
+
+    def set_value_upper_bound(self, val):
+        self.value_upper_bound = val
     def loop_wrapper(self):
         cv2.namedWindow("video_window")
         cv2.namedWindow("binary_window")
@@ -84,9 +100,6 @@ class NeatoFetch(Node):
 
         contours, _ = cv2.findContours(self.binary_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        
-
-        most_circular_contour = None
         highest_circularity = 0
         
         for contour in contours:
@@ -97,40 +110,64 @@ class NeatoFetch(Node):
                 circularity = 4 * np.pi * area / (perimeter * perimeter)
                 if 0.25 <= circularity <= 1.2 and circularity > highest_circularity:  # Adjust thresholds as needed
                     highest_circularity = circularity
-                    most_circular_contour = contour
-        print(f"Width: {self.width}, Height: {self.height}")
+                    self.most_circular_contour = contour
+            print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
 
-        
-        start_point = (self.width -100,self.height)
-        end_point = (100,300)
-        possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
-
+        height, width = self.cv_image.shape[:2]
+        print(f"Width: {width}, Height: {height}")
+                
         fwd_vel = 0.0
         rot_vel = 0.0
         # Draw the most circular contour
-        if most_circular_contour is not None:
-            (x, y), radius = cv2.minEnclosingCircle(most_circular_contour)
+        if self.most_circular_contour is not None:
+            (x, y), radius = cv2.minEnclosingCircle(self.most_circular_contour)
             center = (int(x), int(y))
             radius = int(radius)
             cv2.circle(self.cv_image, center, radius, (0, 255, 0), 2)
                 
-            if most_circular_contour is not None:
-                if most_circular_contour < possession_rect:
+            if self.most_circular_contour is not None:
+                if self.possession() == True:
                     rot_vel = 0.0
                     fwd_vel = 0.0
+                    # self.state = "locate_marker"
+                    # COMMENTED RIGHT NOW ONLY BECAUSE THE LOCATE MARKER STATE HAS NOT BEEN DEFINED
+                    # MEANING ONCE IT SWTICHES TO LOCATE_MARKER IT NEVER SWITCHES BACK TO GO_TO_BALL, NOT ALLOWING US TO TEST THINGS
                     print(f'BALL IS IN POSSESSION BABYYYY but at the moment we are just stopped with it tho.')
 
                 else:
-                    rot_vel = -1 * (x - (self.width / 2)) / (self.width / 2)
+                    rot_vel = -1 * (x - (width / 2)) / (width / 2)
                     fwd_vel = 0.2
                     print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
     
             
-        print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
         print("messsage published")
         self.pub.publish(Twist(linear=Vector3(x=fwd_vel,y=0.0,z=0.0), angular=Vector3(x=0.0,y=0.0,z=rot_vel)))
-        
-    # i wanna call this in the run loop so we have better code readability but i couldnt figure out how to do that without vscode yelling at me
+    def possession(self):
+            height, width = self.cv_image.shape[:2]
+            print(f"Width: {width}, Height: {height}")
+                
+            start_point = (width -100,height)
+            end_point = (100,300)
+            self.possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
+
+            x_ref = 100
+            y_ref = 300
+            width_ref = width
+            height_ref = height
+            self.ref_box = (x_ref, y_ref, width_ref, height_ref)
+
+    # Iterate over contours and check
+            for contour in self.most_circular_contour:
+                # Get the bounding box of the current contour
+                x, y, w, h = cv2.boundingRect(contour)
+
+                # Check if the contour's bounding box is within the reference bounding box
+                if (x >= x_ref and y >= y_ref and x + w <= x_ref + width_ref and y + h <= y_ref + height_ref):
+                    print("Contour's bounding box is within the reference bounding box.")
+                    return True
+                else:
+                    print("Contour's bounding box is not within the reference bounding box.")
+                    return False
     def origin_search(self):
         pass
 
@@ -140,10 +177,10 @@ class NeatoFetch(Node):
         if self.cv_image is not None:
             if (self.state == "go_to_ball"):
                 self.go_to_ball()
+            
             cv2.imshow("video_window", self.cv_image)
             cv2.imshow("binary_window", self.binary_image)
             cv2.waitKey(5)
-        
 
 
 
