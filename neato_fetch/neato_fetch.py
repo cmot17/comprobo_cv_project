@@ -25,7 +25,8 @@ class NeatoFetch(Node):
         self.pub = self.create_publisher(Twist, "cmd_vel", 10)
         thread = Thread(target=self.loop_wrapper)
         thread.start()
-        start_point = (width -100,height)
+        self.height, self.width = self.cv_image.shape[:2]
+        start_point = (self.width -100, self.height)
         end_point = (100,300)
         self.possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
 
@@ -104,10 +105,10 @@ class NeatoFetch(Node):
                     if 0.25 <= circularity <= 1.2 and circularity > highest_circularity:  # Adjust thresholds as needed
                         highest_circularity = circularity
                         most_circular_contour = contour
-            height, width = self.cv_image.shape[:2]
-            print(f"Width: {width}, Height: {height}")
+            print(f"Width: {self.width}, Height: {self.height}")
+
             
-            start_point = (width -100,height)
+            start_point = (self.width -100,self.height)
             end_point = (100,300)
             possession_rect = cv2.rectangle(self.cv_image, start_point, end_point,(255, 0, 0), 2)
 
@@ -127,12 +128,12 @@ class NeatoFetch(Node):
                         print(f'BALL IS IN POSSESSION BABYYYY but at the moment we are just stopped with it tho.')
 
                     else:
-                        rot_vel = -1 * (x - (width / 2)) / (width / 2)
+                        rot_vel = -1 * (x - (self.width / 2)) / (self.width / 2)
                         fwd_vel = 0.2
                         print(f'fwd vel = {fwd_vel}, rot vel = {rot_vel}')
         
                 
-                print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
+            print(f'Most circular contour has perimeter: {perimeter}, area: {area}, and circularity: {highest_circularity}')
             print("messsage published")
             self.pub.publish(Twist(linear=Vector3(x=fwd_vel,y=0.0,z=0.0), angular=Vector3(x=0.0,y=0.0,z=rot_vel)))
             cv2.imshow("video_window", self.cv_image)
